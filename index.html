@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UX × AI — A Pandora manifesto</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=Space+Mono:wght@400;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
+
+  :root {
+    --navy: #0f0f2e; --magenta: #d4009a; --purple: #5b1de8; --purple2: #7c3aed;
+    --white: #ffffff; --text-light: rgba(255,255,255,0.7); --text-dim: rgba(255,255,255,0.45);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--navy); color: var(--white); font-family: 'DM Sans', sans-serif; overflow-x: hidden; cursor: none; }
+
+  #cursor { position: fixed; top: 0; left: 0; z-index: 9999; width: 12px; height: 12px; background: var(--magenta); border-radius: 50%; pointer-events: none; mix-blend-mode: screen; }
+  #cursor-ring { position: fixed; top: 0; left: 0; z-index: 9998; width: 40px; height: 40px; border: 1.5px solid rgba(212,0,154,0.5); border-radius: 50%; pointer-events: none; transition: transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94); }
+  #webgl-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.7; }
+  #progress { position: fixed; top: 0; left: 0; height: 2px; background: linear-gradient(90deg, var(--magenta), var(--purple2)); z-index: 1000; width: 0%; transition: width 0.1s linear; }
+
+  section { position: relative; z-index: 1; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 10vh 8vw; overflow: hidden; }
+
+  /* HERO */
+  #hero { flex-direction: column; text-align: center; padding-top: 15vh; }
+  .hero-eyebrow { font-family: 'Space Mono', monospace; font-size: clamp(0.65rem,1.2vw,0.8rem); letter-spacing: 0.35em; text-transform: uppercase; color: var(--magenta); margin-bottom: 2rem; opacity: 0; transform: translateY(20px); animation: fadeUp 1s ease 0.3s forwards; }
+  .hero-title { font-family: 'Syne', sans-serif; font-weight: 800; font-size: clamp(3.5rem,9vw,10rem); line-height: 0.92; letter-spacing: -0.03em; background: linear-gradient(135deg, #ffffff 0%, #c8b4ff 40%, var(--magenta) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; opacity: 0; transform: translateY(30px); animation: fadeUp 1.2s ease 0.5s forwards; margin-bottom: 0.15em; }
+  /* Subtitle matches Space Mono eyebrow treatment */
+  .hero-sub { font-family: 'Space Mono', monospace; font-weight: 400; font-size: clamp(0.75rem,1.3vw,1rem); color: rgba(255,255,255,0.45); letter-spacing: 0.3em; text-transform: uppercase; opacity: 0; transform: translateY(20px); animation: fadeUp 1.2s ease 0.75s forwards; margin-bottom: 3rem; }
+  .hero-date { font-family: 'Space Mono', monospace; font-size: 0.7rem; color: var(--text-dim); letter-spacing: 0.2em; opacity: 0; animation: fadeUp 1s ease 1.1s forwards; margin-bottom: 5vh; }
+  .scroll-hint { position: absolute; bottom: 5vh; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 0.5rem; opacity: 0; animation: fadeUp 1s ease 1.8s forwards; }
+  .scroll-hint span { font-family: 'Space Mono', monospace; font-size: 0.6rem; letter-spacing: 0.3em; color: var(--text-dim); text-transform: uppercase; }
+  .scroll-line { width: 1px; height: 50px; background: linear-gradient(180deg, var(--magenta), transparent); animation: scrollPulse 2s ease-in-out infinite; }
+
+  /* SHARED */
+  .day-label { font-family: 'Space Mono', monospace; font-size: 0.65rem; letter-spacing: 0.4em; text-transform: uppercase; color: var(--magenta); margin-bottom: 1.5rem; display: flex; align-items: center; gap: 1rem; }
+  .day-label::after { content: ''; display: block; width: 60px; height: 1px; background: var(--magenta); opacity: 0.5; }
+  .section-title { font-family: 'Syne', sans-serif; font-weight: 800; font-size: clamp(2.8rem,6vw,7rem); line-height: 0.95; letter-spacing: -0.03em; margin-bottom: 1.5rem; }
+  .section-title .accent { color: var(--magenta); }
+  .section-title .accent2 { color: #a78bfa; }
+  .section-body { font-size: clamp(1rem,1.5vw,1.15rem); line-height: 1.8; color: var(--text-light); font-weight: 300; max-width: 50ch; }
+
+  /* CARDS */
+  .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 1.5rem 2rem; transition: all 0.4s ease; backdrop-filter: blur(10px); position: relative; overflow: hidden; }
+  .card::before { content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%; background: linear-gradient(180deg, var(--magenta), var(--purple)); opacity: 0; transition: opacity 0.3s ease; }
+  .card:hover { background: rgba(255,255,255,0.07); border-color: rgba(212,0,154,0.3); transform: translateX(8px); }
+  .card:hover::before { opacity: 1; }
+  .card-label { font-family: 'Space Mono', monospace; font-size: 0.6rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--magenta); margin-bottom: 0.5rem; }
+  .card-title { font-family: 'Syne', sans-serif; font-size: 1.05rem; font-weight: 700; color: white; margin-bottom: 0.4rem; }
+  .card-text { font-size: 0.85rem; color: var(--text-light); line-height: 1.65; }
+
+  /* DAY 1 */
+  .day1-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6vw; align-items: center; max-width: 1400px; width: 100%; }
+  .day1-cards { display: flex; flex-direction: column; gap: 1rem; }
+  .big-quote { font-family: 'Syne', sans-serif; font-size: clamp(1.3rem,2.2vw,2.2rem); font-weight: 700; line-height: 1.25; color: rgba(255,255,255,0.9); border-left: 3px solid var(--magenta); padding-left: 2rem; margin: 2.5rem 0 0.75rem; letter-spacing: -0.01em; }
+  .quote-source { font-family: 'DM Sans', sans-serif; font-size: 0.78rem; font-style: italic; color: var(--text-dim); padding-left: 2rem; margin-bottom: 2rem; }
+
+  /* TIERS */
+  .tiers-section { background: linear-gradient(180deg, rgba(91,29,232,0.08) 0%, transparent 100%); border-top: 1px solid rgba(255,255,255,0.06); }
+  .tiers-inner { max-width: 1400px; width: 100%; }
+  .tiers-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 1.5rem; margin-top: 4rem; }
+  .tier-card { position: relative; padding: 2.5rem 2rem; border-radius: 24px; overflow: hidden; transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+  .tier-card:hover { transform: translateY(-12px) scale(1.02); }
+  .tier-card-0 { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); }
+  .tier-card-1 { background: rgba(91,29,232,0.15); border: 1px solid rgba(91,29,232,0.3); }
+  .tier-card-2 { background: rgba(124,58,237,0.2); border: 1px solid rgba(124,58,237,0.4); }
+  .tier-card-3 { background: rgba(212,0,154,0.15); border: 1px solid rgba(212,0,154,0.35); }
+  .tier-num { font-family: 'Syne', sans-serif; font-size: 5rem; font-weight: 800; opacity: 0.12; position: absolute; top: -0.5rem; right: 1rem; line-height: 1; }
+  .tier-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.3rem; margin-bottom: 0.4rem; }
+  .tier-focus { font-family: 'Space Mono', monospace; font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--magenta); margin-bottom: 1rem; }
+  .tier-desc { font-size: 0.85rem; color: var(--text-light); line-height: 1.6; font-style: italic; }
+
+  /* DAY 2 — MOAT FIRST */
+  #day2 { flex-direction: column; }
+  .day2-inner { max-width: 1400px; width: 100%; }
+
+  /* MOAT PILLS — TAPPABLE */
+  .moat-grid-wrap { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin-top: 3rem; }
+  .moat-pill {
+    background: linear-gradient(135deg, rgba(212,0,154,0.15), rgba(91,29,232,0.15));
+    border: 1px solid rgba(212,0,154,0.2); border-radius: 100px;
+    padding: 1.1rem 1rem; text-align: center; font-family: 'Syne', sans-serif;
+    font-size: 0.88rem; font-weight: 700; color: rgba(255,255,255,0.9);
+    transition: all 0.3s ease; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; min-height: 60px;
+    position: relative;
+  }
+  .moat-pill:hover, .moat-pill.active { background: linear-gradient(135deg, rgba(212,0,154,0.35), rgba(91,29,232,0.35)); border-color: var(--magenta); transform: scale(1.03); }
+  .moat-pill.large { grid-column: span 3; padding: 1.5rem; font-size: 1.05rem; background: linear-gradient(135deg, var(--magenta), var(--purple)); border: none; color: white; min-height: 70px; cursor: default; }
+  .moat-pill.large:hover { transform: none; }
+  .moat-expand {
+    grid-column: span 3; display: none;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(212,0,154,0.2);
+    border-radius: 20px; padding: 1.5rem 2rem; margin-top: 0.25rem;
+    font-size: 0.88rem; color: var(--text-light); line-height: 1.7;
+  }
+  .moat-expand.visible { display: block; }
+  .moat-expand strong { color: white; }
+
+  /* WORKFLOW ACCORDIONS */
+  .workflow-section { flex-direction: column; }
+  .workflow-inner { max-width: 1400px; width: 100%; }
+  .workflow-grid { display: flex; flex-direction: column; gap: 1rem; margin-top: 3rem; }
+  .accordion-item { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 20px; overflow: hidden; transition: border-color 0.3s ease; }
+  .accordion-item.open { border-color: rgba(212,0,154,0.25); }
+  .accordion-trigger { width: 100%; background: none; border: none; color: white; padding: 1.8rem 2.5rem; display: flex; align-items: center; justify-content: space-between; cursor: pointer; text-align: left; gap: 2rem; }
+  .accordion-trigger:hover { background: rgba(255,255,255,0.03); }
+  .accordion-trigger-left { display: flex; flex-direction: column; gap: 0.3rem; }
+  .accordion-col-title { font-family: 'Syne', sans-serif; font-size: 1.4rem; font-weight: 700; }
+  .accordion-col-sub { font-size: 0.75rem; color: var(--magenta); font-family: 'Space Mono', monospace; letter-spacing: 0.1em; }
+  .accordion-arrow { width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform 0.35s ease, background 0.3s ease; font-size: 0.9rem; color: var(--magenta); }
+  .accordion-item.open .accordion-arrow { transform: rotate(180deg); background: rgba(212,0,154,0.15); }
+  .accordion-body { max-height: 0; overflow: hidden; transition: max-height 0.45s cubic-bezier(0.4,0,0.2,1); }
+  .accordion-body-inner { padding: 0 2.5rem 2rem; }
+  .wf-items { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; }
+  .wf-item { display: flex; flex-direction: column; gap: 0.2rem; background: rgba(255,255,255,0.04); border-radius: 10px; padding: 0.75rem 1rem 0.75rem 1.5rem; position: relative; }
+  .wf-item::before { content: '→'; position: absolute; left: 0.6rem; top: 0.75rem; color: var(--purple2); font-size: 0.75rem; }
+  .wf-item-title { font-family: 'Syne', sans-serif; font-size: 0.9rem; font-weight: 700; color: white; }
+  .wf-item-desc { font-size: 0.8rem; color: var(--text-light); line-height: 1.55; }
+
+  /* DAY 3 */
+  #day3 { flex-direction: column; }
+  .day3-inner { max-width: 1400px; width: 100%; }
+  .d3-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin-top: 3rem; }
+  .d3-point { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 2rem; transition: all 0.4s ease; position: relative; overflow: hidden; }
+  .d3-point:hover { background: rgba(255,255,255,0.07); border-color: rgba(212,0,154,0.25); }
+  .d3-point-num { font-family: 'Syne', sans-serif; font-size: 3.5rem; font-weight: 800; opacity: 0.07; position: absolute; top: 0.5rem; right: 1.2rem; line-height: 1; }
+  .d3-point-title { font-family: 'Syne', sans-serif; font-size: 1.05rem; font-weight: 700; margin-bottom: 0.5rem; }
+  .d3-point-text { font-size: 0.85rem; color: var(--text-light); line-height: 1.65; }
+
+  /* PATHS — ACCORDION */
+  .paths-accordion { display: flex; flex-direction: column; gap: 1rem; margin-top: 2rem; }
+  .path-acc-item { border-radius: 20px; overflow: hidden; }
+  .path-acc-a { background: rgba(212,0,154,0.08); border: 1px solid rgba(212,0,154,0.2); }
+  .path-acc-b { background: rgba(91,29,232,0.08); border: 1px solid rgba(91,29,232,0.2); }
+  .path-acc-trigger { width: 100%; background: none; border: none; color: white; padding: 1.5rem 2rem; display: flex; align-items: center; justify-content: space-between; cursor: pointer; gap: 2rem; }
+  .path-acc-trigger:hover { background: rgba(255,255,255,0.03); }
+  .path-acc-left { display: flex; flex-direction: column; gap: 0.25rem; text-align: left; }
+  .path-acc-label { font-family: 'Space Mono', monospace; font-size: 0.6rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--magenta); }
+  .path-acc-title { font-family: 'Syne', sans-serif; font-size: 1.3rem; font-weight: 800; }
+  .path-acc-body { max-height: 0; overflow: hidden; transition: max-height 0.4s ease; }
+  .path-acc-body-inner { padding: 0 2rem 1.5rem; }
+  .path-items { list-style: none; display: flex; flex-direction: column; gap: 0.45rem; }
+  .path-items li { font-size: 0.88rem; color: var(--text-light); display: flex; align-items: center; gap: 0.5rem; }
+  .path-items li::before { content: '◆'; color: var(--magenta); font-size: 0.4rem; flex-shrink: 0; }
+  .in-convo { margin-top: 2rem; padding: 1.5rem 2rem; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; background: rgba(255,255,255,0.03); }
+  .in-convo p { font-size: 0.88rem; color: var(--text-light); line-height: 1.7; font-style: italic; }
+  .in-convo strong { color: white; font-style: normal; }
+
+  /* CLOSING */
+  #closing { flex-direction: column; text-align: center; }
+  .closing-inner { max-width: 900px; width: 100%; }
+  .manifesto-text { font-family: 'Syne', sans-serif; font-size: clamp(1.5rem,3.5vw,3.2rem); font-weight: 700; line-height: 1.25; letter-spacing: -0.02em; margin-bottom: 3rem; background: linear-gradient(135deg, #ffffff 0%, #c8b4ff 50%, var(--magenta) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .closing-date { font-family: 'Space Mono', monospace; font-size: 0.7rem; letter-spacing: 0.3em; color: var(--text-dim); text-transform: uppercase; margin-top: 4rem; }
+  .pandora-sig { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.2rem; letter-spacing: 0.2em; color: rgba(255,255,255,0.15); text-transform: uppercase; margin-top: 2rem; }
+
+  /* DIVIDERS */
+  .day-divider { display: flex; align-items: center; gap: 1.5rem; padding: 6vh 8vw; position: relative; z-index: 1; }
+  .div-num { font-family: 'Syne', sans-serif; font-weight: 800; font-size: clamp(5rem,12vw,14rem); line-height: 1; opacity: 0.07; letter-spacing: -0.05em; color: white; }
+  .div-info { display: flex; flex-direction: column; gap: 0.4rem; }
+  .div-tag { font-family: 'Space Mono', monospace; font-size: 0.65rem; letter-spacing: 0.35em; text-transform: uppercase; color: var(--magenta); }
+  .div-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: clamp(1.2rem,3vw,2.5rem); color: rgba(255,255,255,0.85); }
+  .div-line { flex: 1; height: 1px; background: linear-gradient(90deg, rgba(212,0,154,0.4), transparent); }
+
+  /* ANIMATIONS */
+  @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+  @keyframes scrollPulse { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
+  .parallax-orb { position: absolute; border-radius: 50%; filter: blur(80px); pointer-events: none; z-index: 0; }
+  .reveal { opacity: 0; transform: translateY(40px); transition: opacity 0.9s ease, transform 0.9s ease; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+  .reveal-delay-1 { transition-delay: 0.1s; }
+  .reveal-delay-2 { transition-delay: 0.2s; }
+  .reveal-delay-3 { transition-delay: 0.35s; }
+  .reveal-delay-4 { transition-delay: 0.5s; }
+
+  body::after { content: ''; position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events: none; z-index: 500; opacity: 0.4; }
+
+  @media (max-width: 768px) {
+    .day1-grid, .tiers-grid, .d3-grid, .moat-grid-wrap { grid-template-columns: 1fr; }
+    .moat-pill.large, .moat-expand { grid-column: span 1; }
+    body { cursor: auto; }
+    #cursor, #cursor-ring { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+<canvas id="webgl-canvas"></canvas>
+
+<!-- ═══════ HERO ═══════ -->
+<section id="hero">
+  <div class="parallax-orb" style="width:600px;height:600px;background:radial-gradient(circle,rgba(212,0,154,0.25),transparent 70%);top:-200px;right:-150px;"></div>
+  <div class="parallax-orb" style="width:500px;height:500px;background:radial-gradient(circle,rgba(91,29,232,0.2),transparent 70%);bottom:-100px;left:-200px;"></div>
+  <div class="hero-eyebrow">Pandora UX leadership offsite · May 2026</div>
+  <h1 class="hero-title">UX × AI</h1>
+  <div class="hero-sub">a team manifesto</div>
+  <div class="hero-date">Singapore · Three days · One direction</div>
+  <div class="scroll-hint"><span>Scroll</span><div class="scroll-line"></div></div>
+</section>
+
+<!-- ═══════ DAY 1 DIVIDER ═══════ -->
+<div class="day-divider">
+  <div class="div-num">01</div>
+  <div class="div-info"><span class="div-tag">Day one · Context</span><span class="div-title">Where we are</span></div>
+  <div class="div-line"></div>
+</div>
+
+<!-- ═══════ DAY 1 ═══════ -->
+<section id="day1">
+  <div class="parallax-orb" style="width:400px;height:400px;background:radial-gradient(circle,rgba(212,0,154,0.12),transparent 70%);top:10%;left:5%;"></div>
+  <div class="day1-grid">
+    <div class="reveal">
+      <div class="day-label">Day 1 · Context</div>
+      <h2 class="section-title">The<br><span class="accent">stakes</span><br>are real</h2>
+      <p class="section-body" style="margin-top:1.5rem;">Token usage is compounding and we need to be responsible about it. CPOs have aligned on AI enablers. The signal is clear: UX has a meaningful role to play, and now is a good time to shape it.</p>
+      <div class="big-quote">"Execution is free. What relies purely on human judgment?"</div>
+      <div class="quote-source">The framing prompt from our Day 2 brain drain exercise — the question that kicked off our UX moat session.</div>
+    </div>
+    <div class="day1-cards">
+      <div class="card reveal reveal-delay-1">
+        <div class="card-label">Strategic signal</div>
+        <div class="card-title">CPO-level AI enablers</div>
+        <div class="card-text">Three UX-specific AI priorities surfaced at the CPO level: Design QA, User Knowledge Agent, and Prompt Prototyping. These are Pandora's expectations for what UX brings to the AI agenda.</div>
+      </div>
+      <div class="card reveal reveal-delay-2">
+        <div class="card-label">Token economy</div>
+        <div class="card-title">Usage is growing, outcomes must follow</div>
+        <div class="card-text">AI consumption is accelerating across Delivery Hero. The path forward: usage needs to translate into measurable business outcomes, GMV, EBITDA, not just activity.</div>
+      </div>
+      <div class="card reveal reveal-delay-3">
+        <div class="card-label">Wanda's framework</div>
+        <div class="card-title">A map for every person</div>
+        <div class="card-text">A 4-tier maturity model from Adopter to Strategist, grounding what AI fluency means for individuals. We're using this as a compass for where we want to grow as a team.</div>
+      </div>
+      <div class="card reveal reveal-delay-4">
+        <div class="card-label">Nico's POV</div>
+        <div class="card-title">DH as a training ground</div>
+        <div class="card-text">Nico framed this plainly: we're effectively getting paid to upskill. The goal is to drive incremental growth while building the capabilities that make every person more valuable, inside and beyond DH.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TIERS -->
+<section class="tiers-section">
+  <div class="tiers-inner">
+    <div class="reveal" style="text-align:center;margin-bottom:2rem;">
+      <div class="day-label" style="justify-content:center;">Adoption framework · Wanda Santini, Director Talent Development</div>
+      <h2 class="section-title" style="text-align:center;font-size:clamp(2rem,5vw,5rem);">Where do you<br>sit on the <span class="accent">ladder?</span></h2>
+    </div>
+    <div class="tiers-grid">
+      <div class="tier-card tier-card-0 reveal reveal-delay-1"><div class="tier-num">1</div><div class="tier-focus">Literacy &amp; ethics</div><div class="tier-name">Adopter</div><div class="tier-desc">"I know how to use AI at work safely and efficiently."</div></div>
+      <div class="tier-card tier-card-1 reveal reveal-delay-2"><div class="tier-num">2</div><div class="tier-focus">Individual productivity</div><div class="tier-name">Navigator</div><div class="tier-desc">"I'm refining my daily output and reducing manual workload with AI."</div></div>
+      <div class="tier-card tier-card-2 reveal reveal-delay-3"><div class="tier-num">3</div><div class="tier-focus">Custom systems</div><div class="tier-name">Architect</div><div class="tier-desc">"I'm building systems that transform my team's workflow."</div></div>
+      <div class="tier-card tier-card-3 reveal reveal-delay-4"><div class="tier-num">4</div><div class="tier-focus">Business transformation</div><div class="tier-name">Strategist</div><div class="tier-desc">"I'm redesigning how we operate as a business."</div></div>
+    </div>
+    <p class="reveal" style="text-align:center;font-family:'Space Mono',monospace;font-size:0.65rem;letter-spacing:0.2em;color:var(--magenta);margin-top:2.5rem;">Where we're headed as a team: navigator and beyond</p>
+  </div>
+</section>
+
+<!-- ═══════ DAY 2 DIVIDER ═══════ -->
+<div class="day-divider">
+  <div class="div-num">02</div>
+  <div class="div-info"><span class="div-tag">Day two · Architecture</span><span class="div-title">Redesigning how we work</span></div>
+  <div class="div-line"></div>
+</div>
+
+<!-- ═══════ DAY 2: MOAT FIRST ═══════ -->
+<section id="day2">
+  <div class="parallax-orb" style="width:500px;height:500px;background:radial-gradient(circle,rgba(91,29,232,0.15),transparent 70%);top:10%;right:-100px;"></div>
+  <div class="day2-inner">
+    <div class="reveal">
+      <div class="day-label">Day 2 · What only we can do</div>
+      <h2 class="section-title">The <span class="accent">UX</span> moat</h2>
+      <p class="section-body" style="max-width:65ch;">We started the day with one question: if execution becomes free, what is it that only we can do? We brain-drained, clustered, then drafted proof-of-value statements in pairs. Tap each area to see what we said about it.</p>
+    </div>
+    <div class="moat-grid-wrap reveal reveal-delay-1">
+      <div class="moat-pill large">Human values and ethical judgment</div>
+
+      <div class="moat-pill" onclick="toggleMoat(this,'moat-empathy')">Empathy and storytelling</div>
+      <div class="moat-pill" onclick="toggleMoat(this,'moat-systems')">Systems thinking</div>
+      <div class="moat-pill" onclick="toggleMoat(this,'moat-discovery')">Conceptual discovery</div>
+
+      <div class="moat-expand" id="moat-empathy"><strong>Empathy and storytelling.</strong> There was real debate here. Some felt AI will soon be a great storyteller. The counter was that empathetic, inspirational storytelling — the kind that gets stakeholders to believe an idea is their own — requires human judgment and intent. We landed on: yes, it's a human quality, but UX still has a particular craft in it that others don't.</div>
+      <div class="moat-expand" id="moat-systems"><strong>Systems thinking.</strong> This was split into two directions: design system evolution (knowing why past decisions were made, integrating new output into the whole) and conceptual discovery (finding new UX patterns and interactions, pushing the boundaries of what UI can be). Other functions can generate single items via prompts. We integrate them into a coherent system.</div>
+      <div class="moat-expand" id="moat-discovery"><strong>Conceptual discovery.</strong> "Left-field, illogical, connecting-the-dots" thinking. The kind of exploration that finds new interaction paradigms rather than refining existing ones. AI can generate variations inside a paradigm. Shifting the paradigm itself still requires human imagination and taste.</div>
+
+      <div class="moat-pill" onclick="toggleMoat(this,'moat-synthesis')">Synthesis at scale</div>
+      <div class="moat-pill" onclick="toggleMoat(this,'moat-framing')">Strategic framing</div>
+      <div class="moat-pill" onclick="toggleMoat(this,'moat-sim')">Simulation ownership</div>
+
+      <div class="moat-expand" id="moat-synthesis"><strong>Synthesis at scale.</strong> Cross-study pattern identification, connecting qualitative and quantitative signals, building thematic repositories from years of research. AI can surface patterns; UX decides which ones matter and what they mean for the product.</div>
+      <div class="moat-expand" id="moat-framing"><strong>Strategic framing.</strong> Knowing what's worth building. Aligning what we build with values, common sense, and contextual understanding of user history. Not just "what do users want" but "what should we build and why does it matter." That framing is ours.</div>
+      <div class="moat-expand" id="moat-sim"><strong>Synthetic user and market simulation.</strong> A future capability we discussed: running designs through AI-generated user models to test concepts before real research. Ownership isn't decided — it might sit with commercial or product — but the UX lens on what to simulate and how to interpret the results is ours.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ DAY 2: WORKFLOWS ═══════ -->
+<section class="workflow-section">
+  <div class="workflow-inner">
+    <div class="reveal">
+      <div class="day-label">Day 2 · Workflow mapping</div>
+      <h2 class="section-title">Mapping the<br><span class="accent2">new</span> workflow</h2>
+      <p class="section-body" style="margin-bottom:1rem;">Three disciplines, three distinct AI opportunities. We went deep into each to understand not just what to accelerate, but what to protect.</p>
+    </div>
+    <div class="workflow-grid">
+
+      <div class="accordion-item reveal reveal-delay-1">
+        <button class="accordion-trigger" onclick="toggleAccordion(this)">
+          <div class="accordion-trigger-left"><span class="accordion-col-title">Research</span><span class="accordion-col-sub">Clear wins · high potential</span></div>
+          <div class="accordion-arrow">↓</div>
+        </button>
+        <div class="accordion-body"><div class="accordion-body-inner">
+          <ul class="wf-items">
+            <li class="wf-item"><span class="wf-item-title">Transcript analysis and theme identification</span><span class="wf-item-desc">Automated tagging and pattern surfacing from research sessions, reducing time on synthesis groundwork.</span></li>
+            <li class="wf-item"><span class="wf-item-title">Cross-study pattern mining</span><span class="wf-item-desc">Querying across multiple studies to find signals that wouldn't emerge from any single piece of research.</span></li>
+            <li class="wf-item"><span class="wf-item-title">Quantitative and survey analysis</span><span class="wf-item-desc">Statistical and behavioural data processing with AI, reducing manual effort on number-heavy studies.</span></li>
+            <li class="wf-item"><span class="wf-item-title">AI-powered recruitment and participant management</span><span class="wf-item-desc">Currently consuming 1.5 headcount worth of effort. Target: cut manual effort by 50% through automated emails, tracking, and voucher sending.</span></li>
+            <li class="wf-item"><span class="wf-item-title">Survey translation</span><span class="wf-item-desc">What currently takes up to 6 weeks gets reduced to a reviewer role. Already being tested.</span></li>
+            <li class="wf-item"><span class="wf-item-title">Journey mapping automation</span><span class="wf-item-desc">Reducing the manual work of mapping user journeys so more time goes into interpreting them.</span></li>
+            <li class="wf-item"><span class="wf-item-title">Global prompt library</span><span class="wf-item-desc">A shared, growing repository of prompts for the team — including a Slack-integrated version being rebuilt with Ashwin.</span></li>
+          </ul>
+        </div></div>
+      </div>
+
+      <div class="accordion-item reveal reveal-delay-2">
+        <button class="accordion-trigger" onclick="toggleAccordion(this)">
+          <div class="accordion-trigger-left"><span class="accordion-col-title">Product design</span><span class="accordion-col-sub">Active work · open questions</span></div>
+          <div class="accordion-arrow">↓</div>
+        </button>
+        <div class="accordion-body"><div class="accordion-body-inner">
+          <ul class="wf-items">
+            <li class="wf-item"><span class="wf-item-title">AI idea evaluator</span><span class="wf-item-desc">Andy built a Claude-powered agent that evaluates ideas across product, user research, business, and design lenses using past PRDs and research insights as context. Exploration time went from 1 hour to 1 day per idea down to 30 to 60 minutes. He generated 40 ideas in two days this way.</span></li>
+            <li class="wf-item"><span class="wf-item-title">Synthetic user testing</span><span class="wf-item-desc">An emerging concept: running design ideas through AI-generated user models before going to real research. The question we didn't fully resolve is who owns this — UX, research, or commercial. But the potential is significant.</span></li>
+            <li class="wf-item"><span class="wf-item-title">Agentic prototyping</span><span class="wf-item-desc">The core problem: prototypes today are too rigid and limited for interactive testing. The direction we're exploring is AI-generated, Bento-compliant prototypes that can be produced faster and varied more easily — so designers stop defaulting to static screens.</span></li>
+            <li class="wf-item"><span class="wf-item-title">Figma AI integration</span><span class="wf-item-desc">Exploring how Figma's emerging AI features can plug into the Bento design system — enabling designers to generate compliant layouts and components rather than building from scratch each time.</span></li>
+            <li class="wf-item"><span class="wf-item-title">Design QA</span><span class="wf-item-desc">A CPO-level priority. Sarah's team has been mapping the problems to solve. The goal: AI that can check whether what was designed actually matches what was shipped, closing the gap between Figma and live product.</span></li>
+          </ul>
+        </div></div>
+      </div>
+
+      <div class="accordion-item reveal reveal-delay-3">
+        <button class="accordion-trigger" onclick="toggleAccordion(this)">
+          <div class="accordion-trigger-left"><span class="accordion-col-title">Design system</span><span class="accordion-col-sub">13 initiatives · 8 shipped</span></div>
+          <div class="accordion-arrow">↓</div>
+        </button>
+        <div class="accordion-body"><div class="accordion-body-inner">
+          <ul class="wf-items">
+            <li class="wf-item"><span class="wf-item-title">Spec generation automation</span><span class="wf-item-desc">Built on Uber's open-source tooling. Automatically generates component specs — heights, colour tokens, interaction styles, states — that engineers consume and that feed into prototyping pipelines. One of the biggest time savers on the roadmap.</span></li>
+            <li class="wf-item"><span class="wf-item-title">Component adoption tracking</span><span class="wf-item-desc">An analyzer that checks how much of Bento is being used in a given design file, alongside a live in-app Bento usage tracker. For the first time, we can see the delta between what was designed and what's actually in the product.</span></li>
+            <li class="wf-item"><span class="wf-item-title">Token generation and management</span><span class="wf-item-desc">Thousands of design tokens generated for Spark. An internal Token Lab tool replaced paid Token Studio, saving €1000 annually and 8 hours of manual re-linking work.</span></li>
+            <li class="wf-item"><span class="wf-item-title">Component migration tool</span><span class="wf-item-desc">AI-powered tool that automates swapping legacy components to new Spark components — critical given the hundreds of screens that still need updating.</span></li>
+            <li class="wf-item"><span class="wf-item-title">Pre-mapping Figma plugin</span><span class="wf-item-desc">Tiago's commitment: a Figma plugin that pre-maps a file with the expected rigor and enabler standards before any design work begins — so that the setup is already correct from day one, without needing a mandatory checklist.</span></li>
+          </ul>
+        </div></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ DAY 3 DIVIDER ═══════ -->
+<div class="day-divider">
+  <div class="div-num">03</div>
+  <div class="div-info"><span class="div-tag">Day three · Performance</span><span class="div-title">Raising the bar</span></div>
+  <div class="div-line"></div>
+</div>
+
+<!-- ═══════ DAY 3 ═══════ -->
+<section id="day3">
+  <div class="parallax-orb" style="width:600px;height:600px;background:radial-gradient(circle,rgba(212,0,154,0.1),transparent 70%);top:20%;left:-100px;"></div>
+  <div class="day3-inner">
+    <div class="reveal">
+      <div class="day-label">Day 3 · Performance</div>
+      <h2 class="section-title">How we think<br>about <span class="accent">performance</span></h2>
+      <p class="section-body" style="margin-top:1rem;">Day 3 was less about verdicts and more about direction. Four things came out of the conversation that felt worth anchoring to.</p>
+    </div>
+    <div class="d3-grid">
+      <div class="d3-point reveal reveal-delay-1"><div class="d3-point-num">1</div><div class="d3-point-title">Outcomes over outputs</div><div class="d3-point-text">AI fluency shouldn't be measured by how much someone uses the tools. A high performer who delivers exceptional work with or without AI is still a high performer. The question is: what did the work enable, and can we see the impact?</div></div>
+      <div class="d3-point reveal reveal-delay-2"><div class="d3-point-num">2</div><div class="d3-point-title">Fluency lives inside the craft</div><div class="d3-point-text">Rather than adding "AI fluency" as a standalone skill, we'll embed expectations into existing design enablers: craft, file structure, discovery workflows. If you're using AI well, it should be visible in the work itself.</div></div>
+      <div class="d3-point reveal reveal-delay-3"><div class="d3-point-num">3</div><div class="d3-point-title">Rigor standards are rising</div><div class="d3-point-text">Across all tracks, expectations are going up around file structure, design QA, Bento component usage, spec quality, and prototyping standards. Leadership will be more rigorous in calibrations. The bar is moving and that's intentional.</div></div>
+      <div class="d3-point reveal reveal-delay-4"><div class="d3-point-num">4</div><div class="d3-point-title">Curiosity and pace as signals</div><div class="d3-point-text">In a world where tools evolve every few weeks, one of the clearest signals of a strong performer is whether they stay curious and keep pace. Not perfection — genuine engagement with what's changing and what it means for the work.</div></div>
+    </div>
+
+    <div class="card reveal reveal-delay-3" style="background:rgba(212,0,154,0.07);border-color:rgba(212,0,154,0.18);margin-top:2rem;">
+      <div class="card-label">Operational standards</div>
+      <div class="card-title">The checklist is getting real</div>
+      <div class="card-text" style="max-width:none;">A manifesto and rigor checklist are being packaged for the team, with a target of June. Vanessa is leading on the performance integration side. The specifics — what rigor means per enabler, how it gets codified into calibrations — are being worked through collaboratively.</div>
+    </div>
+
+    <div class="reveal" style="margin-top:4rem;">
+      <div class="day-label">Ongoing conversation</div>
+      <h3 style="font-family:'Syne',sans-serif;font-size:clamp(1.8rem,3vw,2.8rem);font-weight:800;letter-spacing:-0.02em;margin-bottom:0.75rem;">Two directions we're <span class="accent">exploring</span></h3>
+      <p class="section-body" style="margin-bottom:1.5rem;">This is still a live discussion. We surfaced two meaningful orientations for how roles within UX might develop. Nothing is decided.</p>
+    </div>
+
+    <div class="paths-accordion reveal reveal-delay-1">
+      <div class="path-acc-item path-acc-a">
+        <button class="path-acc-trigger" onclick="togglePathAcc(this)">
+          <div class="path-acc-left"><span class="path-acc-label">Orientation A</span><span class="path-acc-title">Closer to customer</span></div>
+          <div class="accordion-arrow">↓</div>
+        </button>
+        <div class="path-acc-body"><div class="path-acc-body-inner">
+          <ul class="path-items">
+            <li>Research synthesis and insights</li>
+            <li>User knowledge agents</li>
+            <li>Prompt prototyping</li>
+            <li>Qualitative AI-augmented studies</li>
+            <li>Strategic UX framing and problem definition</li>
+            <li>Human-centered evaluation of AI outputs</li>
+          </ul>
+        </div></div>
+      </div>
+      <div class="path-acc-item path-acc-b">
+        <button class="path-acc-trigger" onclick="togglePathAcc(this)">
+          <div class="path-acc-left"><span class="path-acc-label">Orientation B</span><span class="path-acc-title">Closer to code</span></div>
+          <div class="accordion-arrow">↓</div>
+        </button>
+        <div class="path-acc-body"><div class="path-acc-body-inner">
+          <ul class="path-items">
+            <li>Agentic prototyping and implementation</li>
+            <li>Figma plugin development</li>
+            <li>GitHub code contributions</li>
+            <li>Design system and AI governance</li>
+            <li>Tool building and team enablement</li>
+            <li>Model and data-adjacent UX work</li>
+          </ul>
+        </div></div>
+      </div>
+    </div>
+    <div class="in-convo reveal reveal-delay-2"><p><strong>Still in progress.</strong> These orientations aren't formal tracks yet. They're a starting frame for a conversation we'll continue with the wider team about how expertise and specialisation can evolve in a way that feels right for everyone.</p></div>
+  </div>
+</section>
+
+<!-- ═══════ CLOSING ═══════ -->
+<section id="closing">
+  <div class="parallax-orb" style="width:800px;height:800px;background:radial-gradient(circle,rgba(91,29,232,0.12),transparent 70%);top:-200px;left:50%;transform:translateX(-50%);"></div>
+  <div class="closing-inner">
+    <div class="reveal"><div class="day-label" style="justify-content:center;">The manifesto</div></div>
+    <div class="manifesto-text reveal reveal-delay-1">"We will not wait for AI to be handed to us.<br>We will build the systems.<br>We will define the standards.<br>We will prove the value.<br>And we will remain irreplaceably human<br>where it matters most."</div>
+    <div class="reveal reveal-delay-2" style="display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;">
+      <div class="moat-pill" style="font-size:0.8rem;padding:0.8rem 1.4rem;cursor:default;">Design QA</div>
+      <div class="moat-pill" style="font-size:0.8rem;padding:0.8rem 1.4rem;cursor:default;">User knowledge agent</div>
+      <div class="moat-pill" style="font-size:0.8rem;padding:0.8rem 1.4rem;cursor:default;">Prompt prototyping</div>
+    </div>
+    <div class="closing-date reveal reveal-delay-3">Singapore · May 5 to 7, 2026 · Pandora UX leadership</div>
+    <div class="pandora-sig reveal reveal-delay-4">Pandora</div>
+  </div>
+</section>
+
+<script>
+// CURSOR
+const cursor = document.getElementById('cursor'), cursorRing = document.getElementById('cursor-ring');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cursor.style.transform=`translate(${mx-6}px,${my-6}px)`;});
+(function animRing(){rx+=(mx-rx)*0.12;ry+=(my-ry)*0.12;cursorRing.style.transform=`translate(${rx-20}px,${ry-20}px)`;requestAnimationFrame(animRing);})();
+
+// PROGRESS
+window.addEventListener('scroll',()=>{document.getElementById('progress').style.width=(window.scrollY/(document.documentElement.scrollHeight-window.innerHeight)*100)+'%';});
+
+// REVEAL
+const obs=new IntersectionObserver(entries=>entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible');}),{threshold:0.1});
+document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+
+// PARALLAX
+window.addEventListener('scroll',()=>{const sy=window.scrollY;document.querySelectorAll('.parallax-orb').forEach((o,i)=>{o.style.transform=`translateY(${sy*(i%2===0?.15:-.1)}px)`;});});
+
+// WORKFLOW ACCORDION
+function toggleAccordion(btn){
+  const item=btn.closest('.accordion-item'), body=item.querySelector('.accordion-body'), isOpen=item.classList.contains('open');
+  document.querySelectorAll('.accordion-item.open').forEach(el=>{el.classList.remove('open');el.querySelector('.accordion-body').style.maxHeight='0';});
+  if(!isOpen){item.classList.add('open');body.style.maxHeight=body.scrollHeight+'px';}
+}
+
+// PATHS ACCORDION
+function togglePathAcc(btn){
+  const item=btn.closest('.path-acc-item'), body=item.querySelector('.path-acc-body'), isOpen=body.style.maxHeight&&body.style.maxHeight!=='0px';
+  document.querySelectorAll('.path-acc-body').forEach(b=>{b.style.maxHeight='0';b.closest('.path-acc-item').querySelector('.accordion-arrow').style.transform='';});
+  if(!isOpen){body.style.maxHeight=body.scrollHeight+'px';btn.querySelector('.accordion-arrow').style.transform='rotate(180deg)';}
+}
+
+// MOAT PILLS
+function toggleMoat(pill, expandId){
+  const expand=document.getElementById(expandId), isVisible=expand.classList.contains('visible');
+  document.querySelectorAll('.moat-expand').forEach(e=>{e.classList.remove('visible');});
+  document.querySelectorAll('.moat-pill:not(.large)').forEach(p=>p.classList.remove('active'));
+  if(!isVisible){expand.classList.add('visible');pill.classList.add('active');}
+}
+
+// WEBGL
+const canvas=document.getElementById('webgl-canvas');
+const gl=canvas.getContext('webgl')||canvas.getContext('experimental-webgl');
+if(gl){
+  function resize(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;gl.viewport(0,0,canvas.width,canvas.height);}
+  window.addEventListener('resize',resize);resize();
+  const vs=`attribute vec2 a_pos;void main(){gl_Position=vec4(a_pos,0.0,1.0);}`;
+  const fs=`precision highp float;
+  uniform float u_time;uniform vec2 u_res;uniform vec2 u_mouse;
+  vec3 palette(float t){vec3 a=vec3(0.07,0.04,0.18);vec3 b=vec3(0.08,0.02,0.12);vec3 c=vec3(0.52,0.11,0.58);vec3 d=vec3(0.60,0.10,0.35);return a+b*cos(6.28318*(c*t+d));}
+  float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+  float noise(vec2 p){vec2 i=floor(p);vec2 f=fract(p);f=f*f*(3.0-2.0*f);float a=hash(i);float b=hash(i+vec2(1,0));float c=hash(i+vec2(0,1));float d=hash(i+vec2(1,1));return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);}
+  float fbm(vec2 p){float v=0.0,a=0.5;for(int i=0;i<5;i++){v+=a*noise(p);p*=2.0;a*=0.5;}return v;}
+  void main(){vec2 uv=gl_FragCoord.xy/u_res;vec2 mouse=u_mouse/u_res;float t=u_time*0.18;vec2 p=uv*2.5-1.25;p.x*=u_res.x/u_res.y;vec2 md=(uv-mouse)*1.5;float mDist=length(md);p+=md*0.08/(mDist+0.5);float q0=fbm(p+t*0.3);float q1=fbm(p+vec2(q0*1.5,q0*0.7)+t*0.2);float f=fbm(p+vec2(q1*1.8,q1*0.9));vec3 col=palette(f+t*0.05);float vig=1.0-smoothstep(0.4,1.4,length(uv-0.5));col*=vig*0.9;float sp=hash(uv*u_res*0.003+t*0.5);col+=vec3(sp*0.015);gl_FragColor=vec4(col,1.0);}`;
+  function compileShader(src,type){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);return s;}
+  const prog=gl.createProgram();gl.attachShader(prog,compileShader(vs,gl.VERTEX_SHADER));gl.attachShader(prog,compileShader(fs,gl.FRAGMENT_SHADER));gl.linkProgram(prog);gl.useProgram(prog);
+  const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+  const aPos=gl.getAttribLocation(prog,'a_pos');gl.enableVertexAttribArray(aPos);gl.vertexAttribPointer(aPos,2,gl.FLOAT,false,0,0);
+  const uTime=gl.getUniformLocation(prog,'u_time'),uRes=gl.getUniformLocation(prog,'u_res'),uMouse=gl.getUniformLocation(prog,'u_mouse');
+  let mouseX=window.innerWidth/2,mouseY=window.innerHeight/2;
+  document.addEventListener('mousemove',e=>{mouseX=e.clientX;mouseY=e.clientY;});
+  (function render(t){gl.uniform1f(uTime,t*0.001);gl.uniform2f(uRes,canvas.width,canvas.height);gl.uniform2f(uMouse,mouseX,canvas.height-mouseY);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);requestAnimationFrame(render);})(0);
+}
+</script>
+</body>
+</html>
